@@ -1,0 +1,10 @@
+{
+  "extends": "universe",
+  "plugins": ["react"],
+  "rules": {
+    "no-console": "error",
+    "react/jsx-key": "error",
+    "react/jsx-curly-brace-presence": "error",
+    "prettier/prettier": "off"
+  }
+}

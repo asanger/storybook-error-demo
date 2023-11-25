@@ -1,0 +1,55 @@
+name: "Williams Production - Backend Deploy"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  docker-deploy:
+    uses: ./.github/workflows/williams.backend.docker_deploy.yml
+    with:
+      IMAGE_NAME: europe-west2-docker.pkg.dev/dorilton-motor-sports/dms/dms-cloud-run:${{ github.sha }}
+      REGION: europe-west2
+      WORKING_DIRECTORY: backend
+      DOCKERFILE_LOCATION: williams/Dockerfile
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
+  docker-deploy-acc-launcher:
+    uses: ./.github/workflows/williams.backend.docker_deploy.yml
+    with:
+      IMAGE_NAME: gcr.io/dorilton-motor-sports/acc-launcher:${{ github.sha }}
+      REGION: us-central1
+      WORKING_DIRECTORY: backend/williams/games/acc/launcher
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
+  docker-deploy-acc-server:
+    uses: ./.github/workflows/williams.backend.docker_deploy_acc.yml
+    with:
+      IMAGE_NAME: gcr.io/dorilton-motor-sports/acc-server:latest
+      REGION: us-central1
+      WORKING_DIRECTORY: backend/williams/games/acc/server
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
+      STEAM_APP_ID: ${{ secrets.STEAM_APP_ID }}
+      STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+      STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+  terraform-deploy:
+    uses: ./.github/workflows/williams.backend.terraform_deploy.yml
+    needs:
+      - docker-deploy
+      - docker-deploy-acc-launcher
+      - docker-deploy-acc-server
+    with:
+      WORKSPACE: prd
+      IMAGE_NAME: europe-west2-docker.pkg.dev/dorilton-motor-sports/dms/dms-cloud-run:${{ github.sha }}
+      REGION: europe-west2
+      LAUNCHER_IMAGE_NAME: gcr.io/dorilton-motor-sports/acc-launcher:${{ github.sha }}
+      LAUNCHER_REGION: us-central1
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
+      TERRAFORM_API_TOKEN: ${{ secrets.TERRAFORM_API_TOKEN }}
+      SERVICE_ACCOUNT_NAME: ${{ secrets.CLOUD_SERVICE_ACCOUNT_EMAIL_PRD }}
+  database-migrate:
+    uses: ./.github/workflows/williams.backend.database_migrate.yml
+    needs: terraform-deploy
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}

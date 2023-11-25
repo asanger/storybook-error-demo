@@ -1,0 +1,61 @@
+name: "Google Cloud Build and Push Images (ACC Game Server)"
+
+on:
+  workflow_call:
+    inputs:
+      REGION:
+        required: true
+        type: string
+      IMAGE_NAME:
+        required: true
+        type: string
+      WORKING_DIRECTORY:
+        required: false
+        type: string
+      DOCKERFILE_LOCATION:
+        required: false
+        type: string
+    secrets:
+      GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT:
+        required: true
+      STEAM_USERNAME:
+        required: true
+      STEAM_PASSWORD:
+        required: true
+      STEAM_APP_ID:
+        required: true
+
+jobs:
+  build-push-gar:
+    name: Build and Push to GCP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup GCP Service Account
+        uses: google-github-actions/auth@v1.0.0
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
+
+      - name: Configure gcloud
+        run: |-
+          gcloud config set run/region ${{ inputs.REGION }}
+
+      - name: Configure Docker Client
+        run: |-
+          gcloud auth configure-docker ${{ inputs.REGION }}-docker.pkg.dev,gcr.io --quiet
+
+      - name: Build Docker Image
+        run: |-
+          cd ${{ inputs.WORKING_DIRECTORY || '.' }} && \
+          docker build -f ${{ inputs.DOCKERFILE_LOCATION || 'Dockerfile' }} \
+          . -t ${{ inputs.IMAGE_NAME }} \
+          --build-arg="STEAM_APP_ID=${{ secrets.STEAM_APP_ID }}" \
+          --build-arg="STEAM_USERNAME=${{ secrets.STEAM_USERNAME }}" \
+          --build-arg="STEAM_PASSWORD=${{ secrets.STEAM_PASSWORD }}"
+          
+
+      - name: Push Docker Image to Artifact Registry
+        run: |-
+          docker push ${{ inputs.IMAGE_NAME }}
